@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/hospital
+    username: root
+    password: 15386675194lh
+  redis:
+    host: localhost
+    port: 6379
+    password: 15386675194lh
+    database: 0
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: 100
+  ai:
+    openai:
+      base-url: https://ws-28qye0aawla39rsz.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+      api-key: sk-76eca24e575d415cb37f626d3ee93269
+      chat:
+        model: qwen3.8-max
+        temperature: 0.8
+
+
+logging:
+  level:
+    org.springframework.jdbc.support.JdbcTransactionManager: debug
+
+mybatis-plus:
+  type-aliases-package: com.my.hostipal.pojo.entity
+  mapper-locations: classpath:/mapper/**/*.xml
+  configuration:
+      map-underscore-to-camel-case: true
+
+alipay:
+  easy:
+    protocol: https
+    gatewayHost: openapi.alipaydev.com
+    signType: RSA2
+    appId: 9021000164663471
+    merchantPrivateKey: MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCOreLExm8RniP5EbFtjsA+qPC9CPD4pYVD4TB5KOBOpDipFbDpf9o7KBHOFS+Ix+Lg4kME0Pa3+DPZJ6obht+zrw0FLEWvE9DuH9fAgSgo/flfuwd1hKZsUgzFxtMbsUmHcr7hGNfd1DhjbuEw+C7GSSyOCnk4pzFpT6t3XwzfyHdDeGwIckydAL1CQ4Ic7EflG25x8dH7QdTDYTuhI96u+m7iXZwP8H35U7scZa+bg2vYHHVXbz5+9rFK15ymvvqSxSFNM7603axZPGmXZ7AXJ0DbreNTv9lhWm3L9K3Df0oeL/lcJMpM/Ubq5wl25yMuvG3BrBoi3Ny+oEfouABnAgMBAAECggEAFdB4L2W3bZYkIdyWqA1/TxU9WWmYjiugaHRxmNSrFtr83r02Qz0M/KZvsnaCwgLtqTxuyrm4PwBvzO/HjlXctfg5oWTXcqEw/HdZ4VDd9wZ9rilGRq11VHJnCYYQmNdOSqs8i+Xke0ILLQiy3W3UmPRvH3hyeDr3zwYjTSj3Ku+bmzSLZbyAGWgBpuWdy2Zf2yyu3x4BypHnI9j7ulX16zSgZ/9kPawU04cRnNJSpp13tD3rQGzZH8dxFi7oj4FR0mbeDHdYlRg+q1LQx/Hy5frw+jygiFOeknpNu2HdYptmtcpx22faw/1nwdo2RQOf03JuR/maESDPF5pn9ZaFgQKBgQDtVq+ssvT5rRG6Tx7pl/k0NRqnW+ZYKm80pwKmyoiTq+vB3/XpD8kY+DKlxF9YUsgRqtbf+3XpOOlOMFqLiC1scrH6X6SO2FjbCdJqKHeVuJpb40puCSY9L3br9tcqZPskVxyCppFXqM+IgtWTIbmCpld/6J3NUjiFaArfBud+kQKBgQCZ5dS9b6d73nSa8VJ2xNFE5/4RfVeWnsE1X7aVKYva36HzGYGmm5XN3foD+TBbWRSCgBxpWvMPQO2VCR2Ly299eXp11wpod20dQKjylp9Lu0wG3n31UXF5s41z/jVOHP0dD4DSbwRrsizUmhf/6GTKjxTdo7Z2PJbYgMCMI8T7dwKBgC5ReptjmXeYlRsdEdVYuWO88WS0BLI0JdvKtDPE1v6q0KnXgXBoikB7P7cmKc1c6nq4MpMnyg0n9DA0M5eDjgnaIG3SeJUAF+c3dX8OQrhPfKBuLTpoQrQyLS1D0R4O8wxWi9PbmgXXhhkIH5JFRKUAvZbS2OkXILy4X1bDTC5hAoGACWI2IobYU3kw6vGj8ZH2oJj0qORXntt3NGXtoBK0cFgKa+Q2P45lB/Rs9ikPhcJcuchN8y6Ue22eDuRLZOa2mZP6n4zJGa2OfaYfpwsAE4IMFK8kRvz8SktkaJorbePemxMC69HRFy/6A8yRgg0NeDxZLVp6GaOAHxtaojDcJekCgYARMle9vsQBjF+bOHegq3EwVLYdxHTk8Npa0S7ycBBKl1wJZRMx2HknSW6xSjZi8NRbPaWsZryykOEpKHzXofMVusYRCFCjITjkzoKT1oqIWfExZmfgQZqcJ23OL8ce6kFR+qWfrZzgi6C1ahRrZDOA+eU/APxjwAXGDeIUoERFTA==
+    alipayPublicKey: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlH4mk97Sf0KxwC9qZw4LDajtbsG2dmqlHZcQUg3o2dtFTOkWvh2QzNzvE3Oo32uxTJ4SOJrwIqpdlNVAH3Fcc72YZQ54/P6qkP8W/6uazvlzMcNPshwo5DH28CImDMCQg1tUOdf5EK75bcmBT3pjp/D9AuMKmabxRlGmMSjX78wKcTnRpz21slmVadjzTLxZO3aZgqK6BMhxhKWF2LJngDi6MCasX0FEYeXXt6zKttkbDFL5s5J0KGNzWLxeiCh7piYEOlzhyd8Uxj2RlEH06lypYAFESSUh70HpOqFQlUbAJ3KJ6ndICFqQsCsDyx0MQuggpEg6+bXRTjjUH9jlBQIDAQAB
+    notifyUrl: http://localhost:8080/registration/notify

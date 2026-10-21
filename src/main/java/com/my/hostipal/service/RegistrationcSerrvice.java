@@ -1,0 +1,18 @@
+package com.my.hostipal.service;
+
+import com.my.hostipal.pojo.entity.Schedule;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.List;
+
+public interface RegistrationcSerrvice {
+    List<Schedule> queryDepartment();
+
+    //生成支付的二维码
+    String generateQrCode(Schedule schedule) throws Exception;
+
+    String payCallback(HttpServletRequest request) throws Exception;
+
+    //生成挂号记录
+    void RegistrationRecord() throws InterruptedException;
+}

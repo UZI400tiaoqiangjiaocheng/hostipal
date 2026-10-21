@@ -1,0 +1,11 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.my.hostipal.mapper.RegistrationcMapper">
+    <!--查询排班信息-->
+    <select id="selectScheduleList" resultType="com.my.hostipal.pojo.entity.Schedule">
+        select schedule.*, department.name as department_name from schedule left join department on schedule.department_id = department.id
+        where schedule.schedule_date between #{startDate} and #{endDate}
+    </select>
+</mapper>
