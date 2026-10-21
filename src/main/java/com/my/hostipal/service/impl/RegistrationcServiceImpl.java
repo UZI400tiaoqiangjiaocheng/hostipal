@@ -87,9 +87,9 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
     @Override
     public String generateQrCode(Schedule schedule) throws Exception {
         //判断号源是否充足
-        if (schedule.getTotalQuota()<=schedule.getUsedQuota()){
-            return "号源不足";
-        }
+//        if (schedule.getTotalQuota()<=schedule.getUsedQuota()){
+//            return "号源不足";
+//        }
         //将schedule存入redis中
         redisTemplate.opsForHash().put(RedisConstans.USER_SCHEDULE_KEY+CurrentHolder.getCurrentId(),CurrentHolder.getCurrentId(),schedule);
         //生成通过医生id+科室id+uuid来组成订单号
