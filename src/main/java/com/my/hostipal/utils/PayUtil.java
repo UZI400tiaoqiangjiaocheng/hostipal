@@ -13,6 +13,7 @@ public class PayUtil {
         Factory.setOptions(config);
         AlipayTradePrecreateResponse response = Factory.Payment.FaceToFace().preCreate(subject, orderNo, amount);
         //解析结果
+        System.out.println("-----------------");
         String httpBody = response.getHttpBody();
         //转换为json对象
         JSONObject jsonObject = JSONObject.parseObject(httpBody);

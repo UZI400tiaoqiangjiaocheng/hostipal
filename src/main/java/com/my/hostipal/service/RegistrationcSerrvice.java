@@ -14,5 +14,5 @@ public interface RegistrationcSerrvice {
     String payCallback(HttpServletRequest request) throws Exception;
 
     //生成挂号记录
-    void RegistrationRecord() throws InterruptedException;
+    void RegistrationRecord(String orderNo);
 }

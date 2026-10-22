@@ -40,8 +40,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         redisTemplate.opsForValue().set(
                 TOKEN_KEY + userVO.getId(),
                 token,
-                60L,
-                TimeUnit.MINUTES
+                100L,
+                TimeUnit.DAYS
         );
         //将token存入userVO
         userVO.setToken(token);

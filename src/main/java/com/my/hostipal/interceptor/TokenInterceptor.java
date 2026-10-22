@@ -22,10 +22,11 @@ public class TokenInterceptor implements HandlerInterceptor {
 
         //获取请求路径
         String requestURI = request.getRequestURI();
+        log.info("拦截器收到请求: method={}, uri={}", request.getMethod(), requestURI);
 
         //判断请求路径是否包含/login
-        if(requestURI.contains("/login") || requestURI.contains("/register")){
-            log.info("请求路径包含/login或/register路径，放行");
+        if(requestURI.contains("/login") || requestURI.contains("/register") || requestURI.contains("/notify")){
+            log.info("请求路径包含/login或/register或/notify路径，放行");
             return true;
         }
 

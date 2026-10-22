@@ -38,12 +38,14 @@ public class RegistrationcController {
     //接收支付成功的回调
     @PostMapping("/notify")
     public String notify(HttpServletRequest request) throws Exception {
+        System.out.println("在这里接收支付回调结果");
         String result = registrationcService.payCallback(request);
         log.info("支付回调结果：{}", result);
         //判断是否支付成功
         if (StrUtil.equals(result, "success")) {
             //扣减挂号数量并生成挂号记录
-            registrationcService.RegistrationRecord();
+            String orderNo = request.getParameter("out_trade_no");
+            registrationcService.RegistrationRecord(orderNo);
         }
         return result;
     }

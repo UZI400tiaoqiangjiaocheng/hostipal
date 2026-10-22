@@ -2,6 +2,7 @@ package com.my.hostipal.service.impl;
 
 import cn.hutool.core.lang.UUID;
 import com.alipay.easysdk.kernel.Config;
+import com.my.hostipal.config.AliPayConfig;
 import com.my.hostipal.mapper.RegistrationcMapper;
 import com.my.hostipal.pojo.entity.Department;
 import com.my.hostipal.pojo.entity.Doctor;
@@ -15,10 +16,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +34,7 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
     private RegistrationcMapper registrationcMapper;
 
     @Autowired
-    private StringRedisTemplate redisTemplate;
+    private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
     private RedissonClient redissonClient;
@@ -43,12 +45,15 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
 
     @Override
     public List<Schedule> queryDepartment() {
-        //先从redis查询从今天开始和之后的所有排班信息
-        List<Schedule> scheduleList = null;
-//        Map<Long,Schedule> scheduleMap = new HashMap<>();
+        List<Schedule> scheduleList = new ArrayList<>();
+        //先从redis查询已缓存的排班信息
         Map<Object, Object> scheduleCache = redisTemplate.opsForHash().entries(RedisConstans.SCHEDULE_KEY);
-        for (Map.Entry<Object, Object> entry : scheduleCache.entrySet()) {
-            scheduleList.add((Schedule) entry.getValue());
+        if (scheduleCache != null) {
+            for (Object value : scheduleCache.values()) {
+                if (value instanceof Schedule schedule) {
+                    scheduleList.add(schedule);
+                }
+            }
         }
         //获取当前几点
         LocalDateTime currentTime = LocalDateTime.now();
@@ -56,11 +61,15 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         LocalDate currentDate = LocalDate.now();
 
         //如果redis没有排班信息，从数据库查询排班信息
-        if (scheduleList == null || scheduleList.isEmpty()) {
+        if (scheduleList.isEmpty()) {
             //从数据库查询从今天开始到5天后的排班信息
             scheduleList = registrationcMapper.selectScheduleList(currentDate, currentDate.plusDays(5));
+            if (scheduleList == null) {
+                scheduleList = new ArrayList<>();
+            }
             //并将排班信息缓存到redis hash并设置过期时间为1天
-            Map<Long,Schedule> scheduleMap = scheduleList.stream().collect(Collectors.toMap(Schedule::getId, schedule1 -> schedule1));
+            Map<Long, Schedule> scheduleMap = scheduleList.stream()
+                    .collect(Collectors.toMap(Schedule::getId, schedule -> schedule));
             redisTemplate.opsForHash().putAll(RedisConstans.SCHEDULE_KEY, scheduleMap);
             redisTemplate.expire(RedisConstans.SCHEDULE_KEY, 1, TimeUnit.DAYS);
         }
@@ -68,16 +77,15 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         if (currentTime.getHour() < 12) {
             return scheduleList;
         }
-        if (currentTime.getHour()>=12 && currentTime.getHour()<18) {
-            //从scheduleList中删除今天上午时段和小于今天的排班信息
-            scheduleList.removeIf(schedule -> schedule.getScheduleDate().isBefore(currentDate));
-            scheduleList.removeIf(schedule -> schedule.getScheduleDate().equals(currentDate) && schedule.getTimeSlot().equals("上午"));
-        }
-        if (currentTime.getHour()>=18) {
-            //从scheduleList中删除今天上午和下午时段的排班信息
-            scheduleList.removeIf(schedule -> schedule.getScheduleDate().isBefore(currentDate));
-            scheduleList.removeIf(schedule -> schedule.getScheduleDate().equals(currentDate) && schedule.getTimeSlot().equals("上午"));
-            scheduleList.removeIf(schedule -> schedule.getScheduleDate().equals(currentDate) && schedule.getTimeSlot().equals("下午"));
+        //12点到18点之间：删除今天上午时段和小于今天的排班信息
+        if (currentTime.getHour() < 18) {
+            scheduleList.removeIf(schedule -> schedule.getScheduleDate().isBefore(currentDate)
+                    || (schedule.getScheduleDate().equals(currentDate) && "上午".equals(schedule.getTimeSlot())));
+        } else {
+            //18点之后：删除今天上午和下午时段的排班信息
+            scheduleList.removeIf(schedule -> schedule.getScheduleDate().isBefore(currentDate)
+                    || (schedule.getScheduleDate().equals(currentDate)
+                    && ("上午".equals(schedule.getTimeSlot()) || "下午".equals(schedule.getTimeSlot()))));
         }
         //遍历排班信息，筛选出当前日期后的排班信息
         return scheduleList;
@@ -87,47 +95,65 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
     @Override
     public String generateQrCode(Schedule schedule) throws Exception {
         //判断号源是否充足
-//        if (schedule.getTotalQuota()<=schedule.getUsedQuota()){
-//            return "号源不足";
-//        }
-        //将schedule存入redis中
-        redisTemplate.opsForHash().put(RedisConstans.USER_SCHEDULE_KEY+CurrentHolder.getCurrentId(),CurrentHolder.getCurrentId(),schedule);
+        if (schedule.getTotalQuota() <= schedule.getUsedQuota()) {
+            return "号源不足";
+        }
+        Integer userId = CurrentHolder.getCurrentId();
+        if (userId == null) {
+            return "用户未登录";
+        }
         //生成通过医生id+科室id+uuid来组成订单号
-        String orderNo = schedule.getDoctorId() + schedule.getDepartmentId() + UUID.randomUUID().toString();
+        String orderNo = schedule.getDoctorId() + "-" + schedule.getDepartmentId() + "-" + UUID.randomUUID().toString();
+        //将订单号与排班信息关联，供支付回调后扣减号源；30分钟未支付自动失效
+        redisTemplate.opsForValue().set(RedisConstans.ORDER_KEY + orderNo, schedule, 30, TimeUnit.MINUTES);
         //从redis中查询医生姓名和科室名称
         Doctor doctor = (Doctor) redisTemplate.opsForHash().get(RedisConstans.DOCTOR_KEY, schedule.getDoctorId());
         Department department = (Department) redisTemplate.opsForHash().get(RedisConstans.DEPARTMENT_KEY, schedule.getDepartmentId());
         if (doctor == null || department == null) {
             //如果redis中没有医生姓名和科室名称，从数据库查询医生姓名和科室名称并缓存到redis
-            RLock lock = redissonClient.getLock(RedisConstans.REDIS_LOCK_KEY + CurrentHolder.getCurrentId());
+            RLock lock = redissonClient.getLock(RedisConstans.REDIS_LOCK_KEY + userId);
             //获取锁
-            boolean locked = lock.tryLock(1,TimeUnit.SECONDS);
-            if(locked){
+            boolean locked = lock.tryLock(1, TimeUnit.SECONDS);
+            if (locked) {
                 try {
-                    //查询数据库的doctor表
-                    List<Doctor> doctorList = registrationcMapper.queryDoctor();
-                    //查询数据库的department表
-                    List<Department> departmentList = registrationcMapper.queryDepartment();
-                    //将这两个表以hashmap的形式缓存到redis中
-                    Map<Long, Doctor> doctorMap = doctorList.stream().collect(Collectors.toMap(Doctor::getId, doctor1 -> doctor));
-                    Map<Long, Department> departmentMap = departmentList.stream().collect(Collectors.toMap(Department::getId, department1 -> department1));
-                    redisTemplate.opsForHash().putAll(RedisConstans.DOCTOR_KEY, doctorMap);
-                    redisTemplate.opsForHash().putAll(RedisConstans.DEPARTMENT_KEY, departmentMap);
-                    //设置过期时间为30分钟
-                    redisTemplate.expire(RedisConstans.DOCTOR_KEY, 30, TimeUnit.MINUTES);
-                    redisTemplate.expire(RedisConstans.DEPARTMENT_KEY, 30, TimeUnit.MINUTES);
+                    //双重检查，防止并发时重复查询数据库
+                    doctor = (Doctor) redisTemplate.opsForHash().get(RedisConstans.DOCTOR_KEY, schedule.getDoctorId());
+                    department = (Department) redisTemplate.opsForHash().get(RedisConstans.DEPARTMENT_KEY, schedule.getDepartmentId());
+                    if (doctor == null || department == null) {
+                        //查询数据库的doctor表
+                        List<Doctor> doctorList = registrationcMapper.queryDoctor();
+                        //查询数据库的department表
+                        List<Department> departmentList = registrationcMapper.queryDepartment();
+                        //将这两个表以hashmap的形式缓存到redis中
+                        Map<Long, Doctor> doctorMap = doctorList.stream()
+                                .collect(Collectors.toMap(Doctor::getId, doctor1 -> doctor1));
+                        Map<Long, Department> departmentMap = departmentList.stream()
+                                .collect(Collectors.toMap(Department::getId, department1 -> department1));
+                        redisTemplate.opsForHash().putAll(RedisConstans.DOCTOR_KEY, doctorMap);
+                        redisTemplate.opsForHash().putAll(RedisConstans.DEPARTMENT_KEY, departmentMap);
+                        //设置过期时间为30分钟
+                        redisTemplate.expire(RedisConstans.DOCTOR_KEY, 30, TimeUnit.MINUTES);
+                        redisTemplate.expire(RedisConstans.DEPARTMENT_KEY, 30, TimeUnit.MINUTES);
+                        //查询完成后重新赋值，避免后续使用空值
+                        doctor = doctorMap.get(schedule.getDoctorId());
+                        department = departmentMap.get(schedule.getDepartmentId());
+                    }
                 } finally {
                     //释放锁
                     lock.unlock();
                 }
-            }else {
+            } else {
                 //如果获取锁失败，说明有其他线程正在查询医生姓名和科室名称，等待1秒后重试
                 Thread.sleep(1000);
                 return generateQrCode(schedule);
             }
         }
+        if (doctor == null || department == null) {
+            return "医生或科室信息不存在";
+        }
         //生成支付二维码
-        String qrCode = PayUtil.pay(config, doctor.getName()+department.getName()+"挂号", orderNo, String.valueOf(doctor.getRegistrationFee()));
+        String qrCode = PayUtil.pay(config, doctor.getName() + department.getName() + "挂号", orderNo,
+                String.format("%.2f", doctor.getRegistrationFee()));
         return qrCode;
     }
 
@@ -137,7 +163,8 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         //从request中获取orderNo
         String orderNo = request.getParameter("out_trade_no");
         if (orderNo == null || orderNo.isEmpty()) {
-            orderNo = PayUtil.query(config, orderNo);
+            log.warn("支付回调缺少订单号 out_trade_no");
+            return "fail";
         }
         log.info("支付成功，订单号为：{}", orderNo);
         return "success";
@@ -145,21 +172,23 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
 
     //生成挂号记录
     @Override
-    public void RegistrationRecord() throws InterruptedException {
-        //减少预约号源数
-        RLock lock = redissonClient.getLock(RedisConstans.TOTAL_LOCK_KEY + CurrentHolder.getCurrentId());
-        //获取锁
-        boolean locked = lock.tryLock(1,TimeUnit.SECONDS);
-        if (locked){
-            try {
-                //从redis中获取已预约数量并增加1
-                Schedule userSchedule = (Schedule) redisTemplate.opsForHash().get(RedisConstans.USER_SCHEDULE_KEY+CurrentHolder.getCurrentId(),CurrentHolder.getCurrentId());
-                //从数据库中获取总的预约号源数和已预约号源数
-
-            }finally {
-                //释放锁
-                lock.unlock();
-            }
+    public void RegistrationRecord(String orderNo) {
+        //支付回调无登录态，按订单号从redis中反查排班信息
+        Object obj = redisTemplate.opsForValue().get(RedisConstans.ORDER_KEY + orderNo);
+        if (!(obj instanceof Schedule userSchedule)) {
+            log.warn("未找到订单号对应的排班信息，无法生成挂号记录：{}", orderNo);
+            return;
         }
+        Long scheduleId = userSchedule.getId();
+        //将数据库中的已预约号数+1
+        registrationcMapper.updateUsedQuota(scheduleId);
+        //同步更新redis中排班缓存的已预约数量
+        Object cached = redisTemplate.opsForHash().get(RedisConstans.SCHEDULE_KEY, scheduleId);
+        if (cached instanceof Schedule schedule && schedule.getUsedQuota() != null) {
+            schedule.setUsedQuota(schedule.getUsedQuota() + 1);
+            redisTemplate.opsForHash().put(RedisConstans.SCHEDULE_KEY, scheduleId, schedule);
+        }
+        //删除已处理的订单映射，避免重复回调重复扣减号源
+        redisTemplate.delete(RedisConstans.ORDER_KEY + orderNo);
     }
 }

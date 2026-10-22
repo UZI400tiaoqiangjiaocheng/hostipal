@@ -17,6 +17,6 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(tokenInterceptor)
                 .addPathPatterns("/**")
-                .excludePathPatterns("/login", "/register");
+                .excludePathPatterns("/login", "/register", "/registration/notify");
     }
 }
