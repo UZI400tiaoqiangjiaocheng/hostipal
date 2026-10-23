@@ -2,11 +2,11 @@ package com.my.hostipal.service.impl;
 
 import cn.hutool.core.lang.UUID;
 import com.alipay.easysdk.kernel.Config;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.my.hostipal.config.AliPayConfig;
 import com.my.hostipal.mapper.RegistrationcMapper;
-import com.my.hostipal.pojo.entity.Department;
-import com.my.hostipal.pojo.entity.Doctor;
-import com.my.hostipal.pojo.entity.Schedule;
+import com.my.hostipal.mapper.UserMapper;
+import com.my.hostipal.pojo.entity.*;
 import com.my.hostipal.service.RegistrationcSerrvice;
 import com.my.hostipal.utils.CurrentHolder;
 import com.my.hostipal.utils.PayUtil;
@@ -41,6 +41,9 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
 
     @Autowired
     private Config config;
+
+    @Autowired
+    private UserMapper userMapper;
 
 
     @Override
@@ -102,10 +105,16 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         if (userId == null) {
             return "用户未登录";
         }
+        //判断用户是否已预约该排班
+        Appointment appointment = (Appointment) redisTemplate.opsForHash().get(RedisConstans.APPOINTMENT_KEY+userId, schedule.getId());
+        if (appointment != null) {
+            return "您已预约该排班";
+        }
+
         //生成通过医生id+科室id+uuid来组成订单号
         String orderNo = schedule.getDoctorId() + "-" + schedule.getDepartmentId() + "-" + UUID.randomUUID().toString();
-        //将订单号与排班信息关联，供支付回调后扣减号源；30分钟未支付自动失效
-        redisTemplate.opsForValue().set(RedisConstans.ORDER_KEY + orderNo, schedule, 30, TimeUnit.MINUTES);
+        //将订单号与排班信息关联，供支付回调后扣减号源；15分钟未支付自动失效
+        redisTemplate.opsForValue().set(RedisConstans.ORDER_KEY + orderNo, schedule, 15, TimeUnit.MINUTES);
         //从redis中查询医生姓名和科室名称
         Doctor doctor = (Doctor) redisTemplate.opsForHash().get(RedisConstans.DOCTOR_KEY, schedule.getDoctorId());
         Department department = (Department) redisTemplate.opsForHash().get(RedisConstans.DEPARTMENT_KEY, schedule.getDepartmentId());
@@ -190,5 +199,51 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         }
         //删除已处理的订单映射，避免重复回调重复扣减号源
         redisTemplate.delete(RedisConstans.ORDER_KEY + orderNo);
+        //生成预约挂号记录
+        //获取当前登录用户id
+        Long userid = Long.valueOf(CurrentHolder.getCurrentId());
+        //通过用户id查询用户信息
+        User user = userMapper.selectById(userid);
+        Appointment appointment = new Appointment();
+        appointment.setScheduleId(scheduleId);
+        appointment.setPatientId(userid);
+        appointment.setPatientName(user.getRealName());
+        appointment.setPatientPhone(user.getPhone());
+        appointment.setIdCard(user.getIdCard());
+        appointment.setStatus("已预约");
+        appointment.setCreateTime(LocalDateTime.now());
+        appointment.setUpdateTime(LocalDateTime.now());
+        appointment.setDeleted(0L);
+        //将预约挂号记录插入到数据库
+        registrationcMapper.insert(appointment);
+        //将预约挂号记录缓存到redis中
+        redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY+userid, scheduleId, appointment);
+        //设置过期时间为永久有效
+        redisTemplate.expire(RedisConstans.APPOINTMENT_KEY,30, TimeUnit.MINUTES);
+    }
+
+    //查询预约挂号记录
+    @Override
+    public List<Appointment> queryAppointment() {
+        //1.先从redis中查询缓存
+        Long userid = Long.valueOf(CurrentHolder.getCurrentId());
+        List<Appointment> appointments = redisTemplate.opsForHash()
+                .entries(RedisConstans.APPOINTMENT_KEY + userid)
+                .values()
+                .stream()
+                .map(obj -> (Appointment) obj)
+                .collect(Collectors.toList());
+        //2.如果缓存中没有，从数据库中查询
+        if (appointments.isEmpty() || appointments == null) {
+            //2.1从数据库查询数据
+            appointments = registrationcMapper.selectAppointment(userid);
+            //2.2将查询结果缓存到redis中
+            appointments.forEach(appointment -> {
+                redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY + userid, appointment.getScheduleId(), appointment);
+            });
+            //2.3设置过期时间为永久有效
+            redisTemplate.expire(RedisConstans.APPOINTMENT_KEY + userid, 30, TimeUnit.MINUTES);
+        }
+        return appointments;
     }
 }

@@ -8,4 +8,9 @@
         select schedule.*, department.name as department_name from schedule left join department on schedule.department_id = department.id
         where schedule.schedule_date between #{startDate} and #{endDate}
     </select>
+    <!--插入预约挂号记录-->
+    <insert id="insert" parameterType="com.my.hostipal.pojo.entity.Appointment" useGeneratedKeys="true" keyProperty="id">
+        insert into appointment (schedule_id, patient_id, patient_name, patient_phone, id_card, status, create_time, update_time, deleted)
+        values (#{scheduleId}, #{patientId}, #{patientName}, #{patientPhone}, #{idCard}, #{status}, #{createTime}, #{updateTime}, #{deleted})
+    </insert>
 </mapper>

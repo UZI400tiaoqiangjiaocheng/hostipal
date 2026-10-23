@@ -1,8 +1,10 @@
 package com.my.hostipal.controller;
 
 import cn.hutool.core.util.StrUtil;
+import com.my.hostipal.pojo.entity.Appointment;
 import com.my.hostipal.pojo.entity.Result;
 import com.my.hostipal.pojo.entity.Schedule;
+import com.my.hostipal.pojo.vo.AppointmentVO;
 import com.my.hostipal.service.RegistrationcSerrvice;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -37,16 +39,35 @@ public class RegistrationcController {
 
     //接收支付成功的回调
     @PostMapping("/notify")
-    public String notify(HttpServletRequest request) throws Exception {
-        System.out.println("在这里接收支付回调结果");
-        String result = registrationcService.payCallback(request);
-        log.info("支付回调结果：{}", result);
+    public Result notify(HttpServletRequest request) throws Exception {
+        String status = registrationcService.payCallback(request);
+        AppointmentVO appointmentVO = new AppointmentVO();
+        log.info("支付回调结果：{}", status);
         //判断是否支付成功
-        if (StrUtil.equals(result, "success")) {
+        if (StrUtil.equals(status, "success")) {
             //扣减挂号数量并生成挂号记录
             String orderNo = request.getParameter("out_trade_no");
-            registrationcService.RegistrationRecord(orderNo);
+            appointmentVO.setOrderNo(orderNo);
+            appointmentVO.setStatus(status);
+            //测试,以json的形式输出appointmentVO
+            log.info("appointmentVO: {}", appointmentVO);
+            return Result.success(appointmentVO);
         }
-        return result;
+        return Result.error("支付失败");
+    }
+
+    //生成挂号记录
+    @PostMapping("/addAppointment")
+    public Result addAppointment(@RequestBody AppointmentVO appointmentVO) {
+        registrationcService.RegistrationRecord(appointmentVO.getOrderNo());
+        return Result.success();
+    }
+
+    //查询预约挂号记录
+    @GetMapping("/queryAppointment")
+    public Result queryAppointment() {
+        //查询预约挂号记录
+        List<Appointment> appointments = registrationcService.queryAppointment();
+        return Result.success(appointments);
     }
 }

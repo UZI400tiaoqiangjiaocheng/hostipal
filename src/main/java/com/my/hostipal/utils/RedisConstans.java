@@ -17,4 +17,6 @@ public class RedisConstans {
     public static final String USER_SCHEDULE_KEY = "user:schedule:";
     //订单号 -> 排班信息映射key（支付回调时按订单号反查排班）
     public static final String ORDER_KEY = "order:";
+    //预约挂号记录缓存key
+    public static final String APPOINTMENT_KEY = "registration:appointment:";
 }

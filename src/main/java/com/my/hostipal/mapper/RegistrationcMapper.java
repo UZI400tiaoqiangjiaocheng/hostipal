@@ -1,8 +1,10 @@
 package com.my.hostipal.mapper;
 
+import com.my.hostipal.pojo.entity.Appointment;
 import com.my.hostipal.pojo.entity.Department;
 import com.my.hostipal.pojo.entity.Doctor;
 import com.my.hostipal.pojo.entity.Schedule;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -26,4 +28,11 @@ public interface RegistrationcMapper {
     //更新已预约号源数
     @Update("update schedule set used_quota = used_quota + 1 where id = #{scheduleId}")
     void updateUsedQuota(Long scheduleId);
+
+    //插入预约挂号记录
+    void insert(Appointment appointment);
+
+    //查询预约挂号记录
+    @Select("select * from appointment where patient_id = #{userid}")
+    List<Appointment> selectAppointment(Long userid);
 }

@@ -1,5 +1,6 @@
 package com.my.hostipal.service;
 
+import com.my.hostipal.pojo.entity.Appointment;
 import com.my.hostipal.pojo.entity.Schedule;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -15,4 +16,7 @@ public interface RegistrationcSerrvice {
 
     //生成挂号记录
     void RegistrationRecord(String orderNo);
+
+    //查询预约挂号记录
+    List<Appointment> queryAppointment();
 }
