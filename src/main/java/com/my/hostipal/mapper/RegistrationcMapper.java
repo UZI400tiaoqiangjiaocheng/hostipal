@@ -40,4 +40,14 @@ public interface RegistrationcMapper {
     @Update("update appointment set status = #{status} where id = #{id}")
     void updateStatus(Long id, String status);
 
+    //根据id查询预约挂号记录
+    @Select("select * from appointment where id = #{id}")
+    Appointment selectById(Long id);
+
+    @Select("select registration_fee from doctor where id = #{doctorId}")
+    double selectPrice(Long doctorId);
+
+    //更新排班号源数
+    @Update("update schedule set used_quota = used_quota - #{i} where id = #{id}")
+    void updateQuota(Long id, int i);
 }

@@ -1,7 +1,9 @@
 package com.my.hostipal.service.impl;
 
 import cn.hutool.core.lang.UUID;
+import com.alipay.easysdk.factory.Factory;
 import com.alipay.easysdk.kernel.Config;
+import com.alipay.easysdk.payment.common.models.AlipayTradeRefundResponse;
 import com.my.hostipal.mapper.RegistrationcMapper;
 import com.my.hostipal.mapper.UserMapper;
 import com.my.hostipal.pojo.entity.*;
@@ -17,11 +19,8 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +45,6 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
 
     @Autowired
     private UserMapper userMapper;
-
 
     @Override
     public List<Schedule> queryDepartment() {
@@ -270,8 +268,40 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
 
     //取消预约挂号并完成退款
     @Override
-    public void cancelAppointment(AppointmentVO appointmentVO) {
-        //
+    public String cancelAppointment(AppointmentVO appointmentVO) throws Exception {
+        Long userid = Long.valueOf(CurrentHolder.getCurrentId());
+        //从数据库中查询预约挂号记录
+        Appointment appointment = registrationcMapper.selectById(userid);
+        //从redis中查询排班信息
+        Schedule schedule = (Schedule) redisTemplate.opsForHash().get(RedisConstans.SCHEDULE_KEY, appointment.getScheduleId());
+        LocalDate appointmentDate = appointment.getAppointmentTime().toLocalDate();
+        LocalDate today = LocalDate.now();
 
+        if (!appointmentDate.isBefore(today)) {
+            // 预约日期晚于今天
+            return "预约日期到了，不能行退款";
+        }
+        //对用户进行退款
+        //生成退款订单号
+        String outRequestNo = appointment.getId()+"_"+userid+"_"+UUID.randomUUID();
+        //通过dockerid查询挂号金额
+        double price = registrationcMapper.selectPrice(schedule.getDoctorId());
+        AlipayTradeRefundResponse response = Factory.Payment.Common()
+                .optional("out_request_no", outRequestNo)
+                .optional("refund_reason", "取消预约挂号")
+                .refund(appointmentVO.getOrderNo(), String.valueOf(price));
+        if (!"10000".equals(response.code)){
+            return "退款失败";
+        }
+        //退款成功过后，让排班号源数减少1
+        registrationcMapper.updateQuota(schedule.getId(), 1);
+        //更新redis中排班信息
+        schedule.setUsedQuota(schedule.getUsedQuota()-1);
+        redisTemplate.opsForHash().put(RedisConstans.SCHEDULE_KEY, schedule.getId(), schedule);
+        //更改预约状态为已退款
+        registrationcMapper.updateStatus(appointment.getId(), "已退款");
+        //删除redis中预约挂号记录缓存
+        redisTemplate.opsForHash().delete(RedisConstans.APPOINTMENT_KEY+userid, appointment.getId());
+        return "退款成功";
     }
 }

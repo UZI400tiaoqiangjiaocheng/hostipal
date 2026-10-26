@@ -22,5 +22,5 @@ public interface RegistrationcSerrvice {
     List<Appointment> queryAppointment();
 
     //取消预约挂号并完成退款
-    void cancelAppointment(AppointmentVO appointmentVO);
+    String cancelAppointment(AppointmentVO appointmentVO) throws Exception;
 }

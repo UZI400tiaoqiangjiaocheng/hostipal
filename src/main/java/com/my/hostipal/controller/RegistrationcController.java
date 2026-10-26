@@ -75,7 +75,7 @@ public class RegistrationcController {
 
     //取消预约挂号
     @Update("/cancelAppointment")
-    public Result cancelAppointment(@RequestBody AppointmentVO appointmentVO) {
+    public Result cancelAppointment(@RequestBody AppointmentVO appointmentVO) throws Exception {
         registrationcService.cancelAppointment(appointmentVO);
         return Result.success();
     }
