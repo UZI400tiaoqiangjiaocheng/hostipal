@@ -2,11 +2,10 @@ package com.my.hostipal.service.impl;
 
 import cn.hutool.core.lang.UUID;
 import com.alipay.easysdk.kernel.Config;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.my.hostipal.config.AliPayConfig;
 import com.my.hostipal.mapper.RegistrationcMapper;
 import com.my.hostipal.mapper.UserMapper;
 import com.my.hostipal.pojo.entity.*;
+import com.my.hostipal.pojo.vo.AppointmentVO;
 import com.my.hostipal.service.RegistrationcSerrvice;
 import com.my.hostipal.utils.CurrentHolder;
 import com.my.hostipal.utils.PayUtil;
@@ -18,8 +17,11 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -202,6 +204,18 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         //生成预约挂号记录
         //获取当前登录用户id
         Long userid = Long.valueOf(CurrentHolder.getCurrentId());
+        //获取预约时间
+        LocalDate scheduleDate = userSchedule.getScheduleDate();
+        String timeSlot = userSchedule.getTimeSlot();
+        LocalDateTime appointmentTime = null;
+        //判断时间段
+        if (timeSlot.equals("上午")) {
+            appointmentTime = scheduleDate.atTime(12, 0);
+        } else if (timeSlot.equals("下午")) {
+            appointmentTime = scheduleDate.atTime(18, 0);
+        }else if (timeSlot.equals("晚上")){
+            appointmentTime = scheduleDate.atTime(22, 0);
+        }
         //通过用户id查询用户信息
         User user = userMapper.selectById(userid);
         Appointment appointment = new Appointment();
@@ -214,12 +228,13 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         appointment.setCreateTime(LocalDateTime.now());
         appointment.setUpdateTime(LocalDateTime.now());
         appointment.setDeleted(0L);
+        appointment.setAppointmentTime(appointmentTime);
         //将预约挂号记录插入到数据库
         registrationcMapper.insert(appointment);
         //将预约挂号记录缓存到redis中
         redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY+userid, scheduleId, appointment);
-        //设置过期时间为永久有效
-        redisTemplate.expire(RedisConstans.APPOINTMENT_KEY,30, TimeUnit.MINUTES);
+        //设置过期时间为预约时间30分钟
+        redisTemplate.expire(RedisConstans.APPOINTMENT_KEY+userid,30, TimeUnit.MINUTES);
     }
 
     //查询预约挂号记录
@@ -239,11 +254,24 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
             appointments = registrationcMapper.selectAppointment(userid);
             //2.2将查询结果缓存到redis中
             appointments.forEach(appointment -> {
-                redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY + userid, appointment.getScheduleId(), appointment);
+                //判断是否已经超过预约时间
+                if (appointment.getAppointmentTime().isBefore(LocalDateTime.now())) {
+                    redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY + userid, appointment.getScheduleId(), appointment);
+                }else {
+                    //修改预约状态为已过期
+                    registrationcMapper.updateStatus(appointment.getId(), "已过期");
+                }
             });
-            //2.3设置过期时间为永久有效
+            //2.3设置过期时间为预约时间30分钟
             redisTemplate.expire(RedisConstans.APPOINTMENT_KEY + userid, 30, TimeUnit.MINUTES);
         }
         return appointments;
+    }
+
+    //取消预约挂号并完成退款
+    @Override
+    public void cancelAppointment(AppointmentVO appointmentVO) {
+        //
+
     }
 }

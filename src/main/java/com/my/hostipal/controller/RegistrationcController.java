@@ -8,6 +8,8 @@ import com.my.hostipal.pojo.vo.AppointmentVO;
 import com.my.hostipal.service.RegistrationcSerrvice;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -69,5 +71,12 @@ public class RegistrationcController {
         //查询预约挂号记录
         List<Appointment> appointments = registrationcService.queryAppointment();
         return Result.success(appointments);
+    }
+
+    //取消预约挂号
+    @Update("/cancelAppointment")
+    public Result cancelAppointment(@RequestBody AppointmentVO appointmentVO) {
+        registrationcService.cancelAppointment(appointmentVO);
+        return Result.success();
     }
 }

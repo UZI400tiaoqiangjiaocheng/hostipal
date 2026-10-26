@@ -35,4 +35,9 @@ public interface RegistrationcMapper {
     //查询预约挂号记录
     @Select("select * from appointment where patient_id = #{userid}")
     List<Appointment> selectAppointment(Long userid);
+
+    //更新预约状态
+    @Update("update appointment set status = #{status} where id = #{id}")
+    void updateStatus(Long id, String status);
+
 }

@@ -2,6 +2,7 @@ package com.my.hostipal.service;
 
 import com.my.hostipal.pojo.entity.Appointment;
 import com.my.hostipal.pojo.entity.Schedule;
+import com.my.hostipal.pojo.vo.AppointmentVO;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
@@ -19,4 +20,7 @@ public interface RegistrationcSerrvice {
 
     //查询预约挂号记录
     List<Appointment> queryAppointment();
+
+    //取消预约挂号并完成退款
+    void cancelAppointment(AppointmentVO appointmentVO);
 }
