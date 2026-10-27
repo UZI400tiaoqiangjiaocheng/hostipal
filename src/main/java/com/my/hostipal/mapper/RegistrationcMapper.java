@@ -4,10 +4,7 @@ import com.my.hostipal.pojo.entity.Appointment;
 import com.my.hostipal.pojo.entity.Department;
 import com.my.hostipal.pojo.entity.Doctor;
 import com.my.hostipal.pojo.entity.Schedule;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.*;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -36,13 +33,13 @@ public interface RegistrationcMapper {
     @Select("select * from appointment where patient_id = #{userid}")
     List<Appointment> selectAppointment(Long userid);
 
-    //更新预约状态
-    @Update("update appointment set status = #{status} where id = #{id}")
-    void updateStatus(Long id, String status);
+    //删除预约挂号记录
+    @Delete("delete from appointment where id = #{id}")
+    void deleteById(Long id);
 
     //根据id查询预约挂号记录
-    @Select("select * from appointment where id = #{id}")
-    Appointment selectById(Long id);
+    @Select("select * from appointment where patient_id = #{userid}")
+    Appointment selectById(Long userid);
 
     @Select("select registration_fee from doctor where id = #{doctorId}")
     double selectPrice(Long doctorId);

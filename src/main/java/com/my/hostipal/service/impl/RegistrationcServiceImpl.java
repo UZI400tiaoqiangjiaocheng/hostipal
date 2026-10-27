@@ -256,8 +256,8 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
                 if (appointment.getAppointmentTime().isBefore(LocalDateTime.now())) {
                     redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY + userid, appointment.getScheduleId(), appointment);
                 }else {
-                    //修改预约状态为已过期
-                    registrationcMapper.updateStatus(appointment.getId(), "已过期");
+                    //删除预约挂号记录
+                    registrationcMapper.deleteById(appointment.getId());
                 }
             });
             //2.3设置过期时间为预约时间30分钟
@@ -277,12 +277,13 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         LocalDate appointmentDate = appointment.getAppointmentTime().toLocalDate();
         LocalDate today = LocalDate.now();
 
-        if (!appointmentDate.isBefore(today)) {
+        if (appointmentDate.isBefore(today)) {
             // 预约日期晚于今天
             return "预约日期到了，不能行退款";
         }
         //对用户进行退款
         //生成退款订单号
+        Factory.setOptions(config);
         String outRequestNo = appointment.getId()+"_"+userid+"_"+UUID.randomUUID();
         //通过dockerid查询挂号金额
         double price = registrationcMapper.selectPrice(schedule.getDoctorId());
@@ -298,8 +299,8 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         //更新redis中排班信息
         schedule.setUsedQuota(schedule.getUsedQuota()-1);
         redisTemplate.opsForHash().put(RedisConstans.SCHEDULE_KEY, schedule.getId(), schedule);
-        //更改预约状态为已退款
-        registrationcMapper.updateStatus(appointment.getId(), "已退款");
+        //删除预约挂号记录
+        registrationcMapper.deleteById(appointment.getId());
         //删除redis中预约挂号记录缓存
         redisTemplate.opsForHash().delete(RedisConstans.APPOINTMENT_KEY+userid, appointment.getId());
         return "退款成功";

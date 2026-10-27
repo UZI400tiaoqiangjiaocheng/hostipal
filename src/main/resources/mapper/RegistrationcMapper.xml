@@ -10,7 +10,7 @@
     </select>
     <!--插入预约挂号记录-->
     <insert id="insert" parameterType="com.my.hostipal.pojo.entity.Appointment" useGeneratedKeys="true" keyProperty="id">
-        insert into appointment (schedule_id, patient_id, patient_name, patient_phone, id_card, status, create_time, update_time, deleted)
-        values (#{scheduleId}, #{patientId}, #{patientName}, #{patientPhone}, #{idCard}, #{status}, #{createTime}, #{updateTime}, #{deleted})
+        insert into appointment (schedule_id, patient_id, patient_name, patient_phone, id_card, status, create_time, update_time, deleted,appointment_time)
+        values (#{scheduleId}, #{patientId}, #{patientName}, #{patientPhone}, #{idCard}, #{status}, #{createTime}, #{updateTime}, #{deleted},#{appointmentTime})
     </insert>
 </mapper>
