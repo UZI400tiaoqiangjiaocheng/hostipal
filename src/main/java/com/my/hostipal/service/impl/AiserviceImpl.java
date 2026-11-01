@@ -52,4 +52,15 @@ public class AiserviceImpl implements AiService {
         List<DepartmentVO> departmentVOs = aiMapper.selectDepartment();
         return departmentVOs;
     }
+
+    @Override
+    public void delete(String conversationId) {
+        //获取用户id
+        Long userId = CurrentHolder.getCurrentId().longValue();
+        //删除会话记录
+        String finalConversationId = userId + ":" + conversationId;
+        redisChatMemoryRepository.deleteByConversationId(finalConversationId);
+        //删除数据库中会话id
+        aiMapper.deleteById(userId, conversationId);
+    }
 }

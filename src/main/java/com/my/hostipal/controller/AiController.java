@@ -3,6 +3,7 @@ package com.my.hostipal.controller;
 import com.my.hostipal.pojo.entity.Result;
 import com.my.hostipal.service.AiService;
 import com.my.hostipal.utils.CurrentHolder;
+import org.apache.ibatis.annotations.Delete;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
@@ -59,5 +60,10 @@ public class AiController {
         String finalConversationId = userId + ":" + conversationId;
         List<Message> messages = aiService.getMessages(finalConversationId);
         return Result.success(messages);
+    }
+
+    @Delete("/history/delete")
+    public void delete(String conversationId){
+        aiService.delete(conversationId);
     }
 }

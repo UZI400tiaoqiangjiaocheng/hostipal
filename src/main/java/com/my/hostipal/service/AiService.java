@@ -15,4 +15,5 @@ public interface AiService {
     //查询所有科室
     List<DepartmentVO> queryDepartment();
 
+    void delete(String conversationId);
 }

@@ -2,6 +2,7 @@ package com.my.hostipal.mapper;
 
 import com.my.hostipal.pojo.entity.Conversation;
 import com.my.hostipal.pojo.vo.DepartmentVO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -18,4 +19,7 @@ public interface AiMapper {
 
     @Select("select name,description from department")
     List<DepartmentVO> selectDepartment();
+
+    @Delete("delete from conversation where user_id = #{userId} and conversation_id = #{conversationId}")
+    void deleteById(Long userId, String conversationId);
 }
