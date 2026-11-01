@@ -2,6 +2,7 @@ package com.my.hostipal.service.impl;
 
 import com.my.hostipal.mapper.AiMapper;
 import com.my.hostipal.pojo.entity.Conversation;
+import com.my.hostipal.pojo.vo.DepartmentVO;
 import com.my.hostipal.service.AiService;
 import com.my.hostipal.utils.CurrentHolder;
 import com.my.hostipal.utils.RedisChatMemoryRepository;
@@ -43,5 +44,12 @@ public class AiserviceImpl implements AiService {
         //获取用户id
         List<Message> messages = redisChatMemoryRepository.findByConversationId(conversationId);
         return messages;
+    }
+
+    //查询所有科室
+    @Override
+    public List<DepartmentVO> queryDepartment() {
+        List<DepartmentVO> departmentVOs = aiMapper.selectDepartment();
+        return departmentVOs;
     }
 }
