@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -96,19 +97,23 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
 
     //生成支付的二维码
     @Override
-    public String generateQrCode(Schedule schedule) throws Exception {
+    public Map<String, String> generateQrCode(Schedule schedule) throws Exception {
+        Map<String, String> result = new HashMap<>();
         //判断号源是否充足
         if (schedule.getTotalQuota() <= schedule.getUsedQuota()) {
-            return "号源不足";
+            result.put("error", "号源不足");
+            return result;
         }
         Integer userId = CurrentHolder.getCurrentId();
         if (userId == null) {
-            return "用户未登录";
+            result.put("error", "用户未登录");
+            return result;
         }
         //判断用户是否已预约该排班
         Appointment appointment = (Appointment) redisTemplate.opsForHash().get(RedisConstans.APPOINTMENT_KEY+userId, schedule.getId());
         if (appointment != null) {
-            return "您已预约该排班";
+            result.put("error", "您已预约该排班");
+            return result;
         }
 
         //生成通过医生id+科室id+uuid来组成订单号
@@ -158,12 +163,15 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
             }
         }
         if (doctor == null || department == null) {
-            return "医生或科室信息不存在";
+            result.put("error", "医生或科室信息不存在");
+            return result;
         }
         //生成支付二维码
         String qrCode = PayUtil.pay(config, doctor.getName() + department.getName() + "挂号", orderNo,
                 String.format("%.2f", doctor.getRegistrationFee()));
-        return qrCode;
+        result.put("orderNo", orderNo);
+        result.put("qrCode", qrCode);
+        return result;
     }
 
     //接收支付回调
@@ -222,6 +230,7 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         appointment.setPatientName(user.getRealName());
         appointment.setPatientPhone(user.getPhone());
         appointment.setIdCard(user.getIdCard());
+        appointment.setOrderNo(orderNo);
         appointment.setStatus("已预约");
         appointment.setCreateTime(LocalDateTime.now());
         appointment.setUpdateTime(LocalDateTime.now());
@@ -247,20 +256,23 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
                 .map(obj -> (Appointment) obj)
                 .collect(Collectors.toList());
         //2.如果缓存中没有，从数据库中查询
-        if (appointments.isEmpty() || appointments == null) {
+        if (appointments.isEmpty()) {
             //2.1从数据库查询数据
             appointments = registrationcMapper.selectAppointment(userid);
-            //2.2将查询结果缓存到redis中
-            appointments.forEach(appointment -> {
-                //判断是否已经超过预约时间
-                if (appointment.getAppointmentTime().isBefore(LocalDateTime.now())) {
-                    redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY + userid, appointment.getScheduleId(), appointment);
-                }else {
-                    //删除预约挂号记录
+            //2.2遍历：已过期的从mysql删除，未过期的缓存到redis并保留
+            List<Appointment> validAppointments = new ArrayList<>();
+            for (Appointment appointment : appointments) {
+                if (appointment.getAppointmentTime() != null && appointment.getAppointmentTime().isBefore(LocalDateTime.now())) {
+                    //已超过预约时间，删除预约挂号记录
                     registrationcMapper.deleteById(appointment.getId());
+                } else {
+                    //未过期，缓存到redis
+                    redisTemplate.opsForHash().put(RedisConstans.APPOINTMENT_KEY + userid, appointment.getScheduleId(), appointment);
+                    validAppointments.add(appointment);
                 }
-            });
-            //2.3设置过期时间为预约时间30分钟
+            }
+            appointments = validAppointments;
+            //2.3设置过期时间为30分钟
             redisTemplate.expire(RedisConstans.APPOINTMENT_KEY + userid, 30, TimeUnit.MINUTES);
         }
         return appointments;
@@ -271,26 +283,37 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
     public String cancelAppointment(AppointmentVO appointmentVO) throws Exception {
         Long userid = Long.valueOf(CurrentHolder.getCurrentId());
         //从数据库中查询预约挂号记录
-        Appointment appointment = registrationcMapper.selectById(userid);
+        Appointment appointment = registrationcMapper.selectById(userid, appointmentVO.getAppointmentId());
+        if (appointment == null) {
+            return "未找到预约记录";
+        }
         //从redis中查询排班信息
         Schedule schedule = (Schedule) redisTemplate.opsForHash().get(RedisConstans.SCHEDULE_KEY, appointment.getScheduleId());
+        if (schedule == null) {
+            return "排班信息不存在，无法退款";
+        }
         LocalDate appointmentDate = appointment.getAppointmentTime().toLocalDate();
         LocalDate today = LocalDate.now();
 
         if (appointmentDate.isBefore(today)) {
-            // 预约日期晚于今天
-            return "预约日期到了，不能行退款";
+            // 预约日期已过
+            return "预约日期已过，无法退款";
+        }
+        //订单号在生成挂号记录时已持久化，退款直接从数据库读取
+        String orderNo = appointment.getOrderNo();
+        if (orderNo == null || orderNo.isEmpty()) {
+            return "缺少订单号，无法退款";
         }
         //对用户进行退款
         //生成退款订单号
         Factory.setOptions(config);
         String outRequestNo = appointment.getId()+"_"+userid+"_"+UUID.randomUUID();
-        //通过dockerid查询挂号金额
+        //通过doctorid查询挂号金额
         double price = registrationcMapper.selectPrice(schedule.getDoctorId());
         AlipayTradeRefundResponse response = Factory.Payment.Common()
                 .optional("out_request_no", outRequestNo)
                 .optional("refund_reason", "取消预约挂号")
-                .refund(appointmentVO.getOrderNo(), String.valueOf(price));
+                .refund(orderNo, String.valueOf(price));
         if (!"10000".equals(response.code)){
             return "退款失败";
         }
@@ -299,10 +322,10 @@ public class RegistrationcServiceImpl implements RegistrationcSerrvice {
         //更新redis中排班信息
         schedule.setUsedQuota(schedule.getUsedQuota()-1);
         redisTemplate.opsForHash().put(RedisConstans.SCHEDULE_KEY, schedule.getId(), schedule);
-        //删除预约挂号记录
+        //删除预约挂号记录（mysql）
         registrationcMapper.deleteById(appointment.getId());
-        //删除redis中预约挂号记录缓存
-        redisTemplate.opsForHash().delete(RedisConstans.APPOINTMENT_KEY+userid, appointment.getId());
+        //删除redis中预约挂号记录缓存（hash 的 field 是 scheduleId，而非 appointmentId）
+        redisTemplate.opsForHash().delete(RedisConstans.APPOINTMENT_KEY+userid, appointment.getScheduleId());
         return "退款成功";
     }
 }

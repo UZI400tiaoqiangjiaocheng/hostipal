@@ -17,6 +17,7 @@ public class Appointment {
     private String patientName; //患者姓名
     private String patientPhone; //患者手机号
     private String idCard; //患者身份证号
+    private String orderNo; //订单号（支付宝支付订单号）
     private String status; //预约状态
     private LocalDateTime createTime; //创建时间
     private LocalDateTime updateTime; //更新时间

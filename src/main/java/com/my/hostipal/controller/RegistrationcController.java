@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @Slf4j
@@ -34,9 +35,9 @@ public class RegistrationcController {
     //点击预约生成挂号订单
     @PostMapping("/generateOrder")
     public Result generateOrder(@RequestBody Schedule schedule) throws Exception {
-        //生成支付的二维码
-        String qrCode = registrationcService.generateQrCode(schedule);
-        return Result.success(qrCode);
+        //生成支付的二维码，同时返回订单号
+        Map<String, String> result = registrationcService.generateQrCode(schedule);
+        return Result.success(result);
     }
 
     //接收支付成功的回调

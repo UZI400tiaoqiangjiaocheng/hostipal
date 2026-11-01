@@ -6,12 +6,13 @@ import com.my.hostipal.pojo.vo.AppointmentVO;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
+import java.util.Map;
 
 public interface RegistrationcSerrvice {
     List<Schedule> queryDepartment();
 
-    //生成支付的二维码
-    String generateQrCode(Schedule schedule) throws Exception;
+    //生成支付的二维码，同时返回订单号 orderNo 与二维码 qrCode（失败时返回 error）
+    Map<String, String> generateQrCode(Schedule schedule) throws Exception;
 
     String payCallback(HttpServletRequest request) throws Exception;
 

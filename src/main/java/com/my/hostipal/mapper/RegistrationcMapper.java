@@ -38,8 +38,8 @@ public interface RegistrationcMapper {
     void deleteById(Long id);
 
     //根据id查询预约挂号记录
-    @Select("select * from appointment where patient_id = #{userid}")
-    Appointment selectById(Long userid);
+    @Select("select * from appointment where patient_id = #{userid} and id = #{appointmentId}")
+    Appointment selectById(Long userid, Long appointmentId);
 
     @Select("select registration_fee from doctor where id = #{doctorId}")
     double selectPrice(Long doctorId);
